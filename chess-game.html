@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chess Game</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #2f3542;
+    }
+    .board {
+      width: 560px;
+      height: 560px;
+      border: 20px solid #723d46;
+      border-radius: 5px;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    .square {
+      width: 70px;
+      height: 70px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      background-size: 85%;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    .white {
+      background-color: #eed4ac;
+    }
+    .black {
+      background-color: #b88b4a;
+    }
+    .selected {
+      background-color: #7b61ff;
+    }
+    .possible-move::after {
+      content: '';
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: rgba(106, 176, 76, 0.7);
+    }
+    .possible-move.occupied::after {
+      width: 70px;
+      height: 70px;
+      border-radius: 0;
+      border: 4px solid rgba(106, 176, 76, 0.7);
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class="board" id="board"></div>
+
+  <script>
+    // Piece images from Wikimedia Commons
+    const pieces = {
+      '♚': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
+      '♛': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
+      '♜': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
+      '♝': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
+      '♞': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
+      '♟': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg',
+      '♔': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
+      '♕': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+      '♖': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+      '♗': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+      '♘': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+      '♙': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg'
+    };
+
+    const initialBoard = [
+      '♜','♞','♝','♛','♚','♝','♞','♜',
+      '♟','♟','♟','♟','♟','♟','♟','♟',
+      '','','','','','','','',
+      '','','','','','','','',
+      '','','','','','','','',
+      '','','','','','','','',
+      '♙','♙','♙','♙','♙','♙','♙','♙',
+      '♖','♘','♗','♕','♔','♗','♘','♖'
+    ];
+
+    let board = [...initialBoard];
+    let selectedSquare = null;
+    let possibleMoves = [];
+    
+    function createBoard() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+      
+      for (let i = 0; i < 64; i++) {
+        const square = document.createElement('div');
+        square.className = `square ${(Math.floor(i/8) + i%8) % 2 ? 'black' : 'white'}`;
+        if (selectedSquare === i) {
+          square.classList.add('selected');
+        }
+        if (possibleMoves.includes(i)) {
+          square.classList.add('possible-move');
+          if (board[i]) {
+            square.classList.add('occupied');
+          }
+        }
+        if (board[i]) {
+          square.style.backgroundImage = `url(${pieces[board[i]]})`;
+        }
+        square.addEventListener('click', () => handleSquareClick(i));
+        boardEl.appendChild(square);
+      }
+    }
+
+    function getPossibleMoves(index) {
+      const piece = board[index];
+      const row = Math.floor(index / 8);
+      const col = index % 8;
+      const moves = [];
+
+      if (piece === '♟') {
+        if (row < 7 && !board[index + 8]) {
+          moves.push(index + 8);
+          if (row === 1 && !board[index + 16]) {
+            moves.push(index + 16);
+          }
+        }
+        if (row < 7 && col > 0 && isWhitePiece(board[index + 7])) {
+          moves.push(index + 7);
+        }
+        if (row < 7 && col < 7 && isWhitePiece(board[index + 9])) {
+          moves.push(index + 9);
+        }
+      }
+      else if (piece === '♙') {
+        if (row > 0 && !board[index - 8]) {
+          moves.push(index - 8);
+          if (row === 6 && !board[index - 16]) {
+            moves.push(index - 16);
+          }
+        }
+        if (row > 0 && col > 0 && isBlackPiece(board[index - 9])) {
+          moves.push(index - 9);
+        }
+        if (row > 0 && col < 7 && isBlackPiece(board[index - 7])) {
+          moves.push(index - 7);
+        }
+      }
+      else if (piece === '♜' || piece === '♖') {
+        [-8, -1, 1, 8].forEach(dir => {
+          let pos = index + dir;
+          while (pos >= 0 && pos < 64 && 
+                 (dir === 8 || dir === -8 || (Math.floor(pos/8) === row)) && 
+                 !isSameColorPiece(board[pos], piece)) {
+            moves.push(pos);
+            if (board[pos]) break;
+            pos += dir;
+          }
+        });
+      }
+      else if (piece === '♞' || piece === '♘') {
+        const knightMoves = [-17, -15, -10, -6, 6, 10, 15, 17];
+        knightMoves.forEach(move => {
+          const pos = index + move;
+          if (pos >= 0 && pos < 64 && 
+              Math.abs(Math.floor(pos/8) - row) + Math.abs((pos%8) - col) === 3 &&
+              !isSameColorPiece(board[pos], piece)) {
+            moves.push(pos);
+          }
+        });
+      }
+      else if (piece === '♝' || piece === '♗') {
+        [-9, -7, 7, 9].forEach(dir => {
+          let pos = index + dir;
+          while (pos >= 0 && pos < 64 && 
+                 Math.abs((pos%8) - (pos-dir)%8) === 1 &&
+                 !isSameColorPiece(board[pos], piece)) {
+            moves.push(pos);
+            if (board[pos]) break;
+            pos += dir;
+          }
+        });
+      }
+      else if (piece === '♛' || piece === '♕') {
+        [-9, -8, -7, -1, 1, 7, 8, 9].forEach(dir => {
+          let pos = index + dir;
+          while (pos >= 0 && pos < 64 && 
+                 (dir === 8 || dir === -8 || Math.abs((pos%8) - (pos-dir)%8) <= 1) &&
+                 !isSameColorPiece(board[pos], piece)) {
+            moves.push(pos);
+            if (board[pos]) break;
+            pos += dir;
+          }
+        });
+      }
+      else if (piece === '♚' || piece === '♔') {
+        [-9, -8, -7, -1, 1, 7, 8, 9].forEach(dir => {
+          const pos = index + dir;
+          if (pos >= 0 && pos < 64 && 
+              Math.abs((pos%8) - (pos-dir)%8) <= 1 &&
+              !isSameColorPiece(board[pos], piece)) {
+            moves.push(pos);
+          }
+        });
+      }
+
+      return moves;
+    }
+
+    function isWhitePiece(piece) {
+      return '♔♕♖♗♘♙'.includes(piece);
+    }
+
+    function isBlackPiece(piece) {
+      return '♚♛♜♝♞♟'.includes(piece);
+    }
+
+    function isSameColorPiece(piece1, piece2) {
+      if (!piece1 || !piece2) return false;
+      return (isWhitePiece(piece1) && isWhitePiece(piece2)) ||
+             (isBlackPiece(piece1) && isBlackPiece(piece2));
+    }
+
+    function handleSquareClick(index) {
+      if (selectedSquare === null && board[index]) {
+        selectedSquare = index;
+        possibleMoves = getPossibleMoves(index);
+      } else if (selectedSquare === index) {
+        selectedSquare = null;
+        possibleMoves = [];
+      } else if (possibleMoves.includes(index)) {
+        board[index] = board[selectedSquare];
+        board[selectedSquare] = '';
+        selectedSquare = null;
+        possibleMoves = [];
+      } else if (board[index]) {
+        selectedSquare = index;
+        possibleMoves = getPossibleMoves(index);
+      } else {
+        selectedSquare = null;
+        possibleMoves = [];
+      }
+      createBoard();
+    }
+
+    createBoard();
+  </script>
+</body>
+</html>
