@@ -300,10 +300,7 @@
       createBoard();
     });
 
-    // ... [Previous movement logic remains the same until handleSquareClick] ...
-
     function handleSquareClick(index) {
-      // Don't allow moves when reviewing history
       if (currentMove !== moveHistory.length - 1 && currentMove !== -1) {
         return;
       }
@@ -315,17 +312,44 @@
         selectedSquare = null;
         possibleMoves = [];
       } else if (possibleMoves.includes(index)) {
+        const piece = board[selectedSquare];
+        const isKing = piece === '♔' || piece === '♚';
+        const isCastling = isKing && Math.abs(index - selectedSquare) === 2;
         const capture = board[index] !== '';
-        const moveNotation = getMoveNotation(
-          selectedSquare,
-          index,
-          board[selectedSquare],
-          capture
-        );
         
-        // Make the move
-        board[index] = board[selectedSquare];
-        board[selectedSquare] = '';
+        let moveNotation;
+        
+        if (isCastling) {
+          // Handle castling move
+          const isKingside = index % 8 === 6;
+          moveNotation = isKingside ? 'O-O' : 'O-O-O';
+          
+          // Move the king
+          board[index] = board[selectedSquare];
+          board[selectedSquare] = '';
+          
+          // Move the rook
+          const baseRank = Math.floor(index / 8);
+          if (isKingside) {
+            board[baseRank * 8 + 5] = board[baseRank * 8 + 7];
+            board[baseRank * 8 + 7] = '';
+          } else {
+            board[baseRank * 8 + 3] = board[baseRank * 8];
+            board[baseRank * 8] = '';
+          }
+        } else {
+          // Normal move
+          moveNotation = getMoveNotation(
+            selectedSquare,
+            index,
+            board[selectedSquare],
+            capture
+          );
+          
+          // Make the move
+          board[index] = board[selectedSquare];
+          board[selectedSquare] = '';
+        }
         
         // Record the move
         moveHistory = moveHistory.slice(0, currentMove + 1);
@@ -334,6 +358,7 @@
           to: index,
           piece: board[index],
           captured: capture,
+          castling: isCastling,
           notation: moveNotation,
           board: [...board]
         });
@@ -350,7 +375,6 @@
       }
       createBoard();
     }
-
     function isWhitePiece(piece) {
       return '♔♕♖♗♘♙'.includes(piece);
     }
@@ -455,6 +479,46 @@
             moves.push(pos);
           }
         });
+
+        // Castling
+        const isWhiteKing = piece === '♔';
+        const baseRank = isWhiteKing ? 7 : 0;
+        const correctRank = Math.floor(index / 8) === baseRank;
+        const kingNotMoved = !moveHistory.some(move => 
+          move.piece === piece && move.from === baseRank * 8 + 4
+        );
+
+        if (correctRank && kingNotMoved) {
+          // Kingside castling
+          const kingsideRook = isWhiteKing ? '♖' : '♜';
+          const kingsideRookPos = baseRank * 8 + 7;
+          const kingsideEmpty = !board[baseRank * 8 + 5] && !board[baseRank * 8 + 6];
+          const kingsideRookNotMoved = !moveHistory.some(move => 
+            move.from === kingsideRookPos
+          );
+
+          if (board[kingsideRookPos] === kingsideRook && 
+              kingsideEmpty && 
+              kingsideRookNotMoved) {
+            moves.push(baseRank * 8 + 6); // Mark castling move as possible
+          }
+
+          // Queenside castling
+          const queensideRook = isWhiteKing ? '♖' : '♜';
+          const queensideRookPos = baseRank * 8;
+          const queensideEmpty = !board[baseRank * 8 + 1] && 
+                                !board[baseRank * 8 + 2] && 
+                                !board[baseRank * 8 + 3];
+          const queensideRookNotMoved = !moveHistory.some(move => 
+            move.from === queensideRookPos
+          );
+
+          if (board[queensideRookPos] === queensideRook && 
+              queensideEmpty && 
+              queensideRookNotMoved) {
+            moves.push(baseRank * 8 + 2); // Mark castling move as possible
+          }
+        }
       }
 
       return moves;
